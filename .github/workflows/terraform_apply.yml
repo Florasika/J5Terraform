@@ -1,0 +1,60 @@
+# ============================================================
+#  GitHub Actions : terraform apply sur merge dans main
+#  Fichier : .github/workflows/terraform-apply.yml
+# ============================================================
+
+name: Terraform Apply
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.tf'
+      - '**.tfvars'
+
+permissions:
+  contents: read
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    environment: production    # environnement GitHub avec protection
+
+    defaults:
+      run:
+        working-directory: ./day-05-cicd
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Apply
+        run: |
+          terraform apply \
+            -var="commit_sha=${{ github.sha }}" \
+            -var="version_app=${{ github.ref_name }}" \
+            -auto-approve \
+            -no-color
+
+      - name: Terraform Output
+        run: terraform output -json
+
+      # Uploader les artefacts générés
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs-${{ github.sha }}
+          path: ./day-05-cicd/output/
+          retention-days: 30

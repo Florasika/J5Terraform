@@ -1,0 +1,33 @@
+# Makefile Terraform — commandes simplifiées
+# Usage : make plan | make apply | make destroy
+
+ENV ?= dev
+
+init:
+	terraform init
+
+fmt:
+	terraform fmt -recursive
+
+validate: fmt
+	terraform validate
+
+plan: validate
+	terraform plan -var="environnement=$(ENV)" -out=tfplan
+
+apply: plan
+	terraform apply tfplan
+
+apply-auto:
+	terraform apply -var="environnement=$(ENV)" -auto-approve
+
+destroy:
+	terraform destroy -var="environnement=$(ENV)" -auto-approve
+
+output:
+	terraform output -json | python3 -m json.tool
+
+clean:
+	rm -rf .terraform/ terraform.tfstate* tfplan output/
+
+.PHONY: init fmt validate plan apply apply-auto destroy output clean

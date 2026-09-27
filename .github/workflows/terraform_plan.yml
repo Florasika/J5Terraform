@@ -1,0 +1,96 @@
+# ============================================================
+#  GitHub Actions : terraform plan sur chaque Pull Request
+#  Fichier : .github/workflows/terraform-plan.yml
+# ============================================================
+
+name: Terraform Plan
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.tf'
+      - '**.tfvars'
+
+permissions:
+  contents: read
+  pull-requests: write    # pour commenter la PR avec le plan
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./day-05-cicd
+
+    steps:
+      # 1. Récupérer le code
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Installer Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      # 3. Formater le code (vérification)
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      # 4. Initialiser
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      # 5. Valider la syntaxe
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      # 6. Générer le plan
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -var="commit_sha=${{ github.sha }}" \
+            -no-color \
+            -out=tfplan
+        continue-on-error: true
+
+      # 7. Commenter la PR avec le résultat du plan
+      - name: Comment PR with Plan
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Format  \`${{ steps.fmt.outcome }}\`
+            #### Terraform Init    \`${{ steps.init.outcome }}\`
+            #### Terraform Validate \`${{ steps.validate.outcome }}\`
+            #### Terraform Plan    \`${{ steps.plan.outcome }}\`
+
+            <details><summary>Voir le Plan</summary>
+
+            \`\`\`terraform
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+
+            </details>
+
+            *Déclencheur : \`${{ github.event_name }}\` | Workflow : \`${{ github.workflow }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      # 8. Faire échouer si le plan a des erreurs
+      - name: Check Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1

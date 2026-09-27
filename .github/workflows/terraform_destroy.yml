@@ -1,0 +1,44 @@
+# ============================================================
+#  GitHub Actions : terraform destroy (manuel uniquement)
+#  Fichier : .github/workflows/terraform-destroy.yml
+# ============================================================
+
+name: Terraform Destroy
+
+on:
+  workflow_dispatch:      # déclenchement MANUEL uniquement
+    inputs:
+      environnement:
+        description: 'Environnement à détruire'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+      confirmer:
+        description: 'Taper CONFIRMER pour valider'
+        required: true
+
+jobs:
+  destroy:
+    name: Terraform Destroy
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirmer == 'CONFIRMER'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Terraform Init
+        working-directory: ./day-05-cicd
+        run: terraform init
+
+      - name: Terraform Destroy
+        working-directory: ./day-05-cicd
+        run: |
+          terraform destroy \
+            -var="environnement=${{ github.event.inputs.environnement }}" \
+            -auto-approve
